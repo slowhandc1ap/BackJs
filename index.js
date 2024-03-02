@@ -1,100 +1,117 @@
-
-const express = require("express");
-const sqlite3 = require("sqlite3");
+const express = require('express');
+const Sequelize = require('sequelize');
 const app = express();
 
-//connect to data base
-const db = new sqlite3.Database("./Database/task.sqlite");
-
-// parse incoming requests
 app.use(express.json());
 
-db.run(`CREATE TABLE IF NOT EXISTS Tasks (
-    TasksID INTEGER PRIMARY KEY,
-    TaskTitle TEXT,
-    TaskDescription TEXT,
-    Importance TEXT,
-    DueDate TIMESTAMP,
-    TypeID INTEGER
-)`);
-
-// const newTableRoutes = require('./type.js'); // เชื่อมโยงไปยังไฟล์ใหม่
-
-// // Use routes for new table
-// app.use('/newtable', newTableRoutes); // ใช้เส้นทางสำหรับตารางใหม่
-
-// Create a task
-app.post("/tasks", (req, res) => {
-  const { TaskTitle, TaskDescription, Importance, DueDate, TypeID } = req.body;
-  db.run(
-    `INSERT INTO Tasks (TaskTitle, TaskDescription, Importance, DueDate, TypeID) VALUES (?, ?, ?, ?, ?)`,
-    [TaskTitle, TaskDescription, Importance, DueDate, TypeID],
-    (err) => {
-      if (err) {
-        console.error(err.message);
-        return res.status(500).send("Server Error");
-      }
-      res.send("Task created successfully");
-    },
-  );
+// Annound where database is 
+const sequelize = new Sequelize('database','username','password' , {
+  host: 'localhost' ,
+  dialect: 'sqlite',
+  storage: '.library.db'
 });
 
-// Read all tasks
-app.get("/tasks", (req, res) => {
-  db.all(`SELECT * FROM Tasks`, (err, rows) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Server Error");
-    }
-    res.json(rows);
+// DataBase of Tasks
+const Task = sequelize.define('tasks',{
+  id: {
+    type: Sequelize.INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  },
+  title: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  discription:{
+    type: Sequelize.STRING,
+    allowNull:false
+  },
+  duedate: {
+    type: Sequelize.DATE,
+    allowNull: false
+  },
+  type_id:{
+    type: Sequelize.INTEGER,
+    allowNull: false
+  }
+  
+});
+
+//Database of TypeTask
+const Type = sequelize.define('types',{
+  type_id:{
+    type: Sequelize.INTEGER,
+    autoIncrement:true,
+    primaryKey: true
+  },
+  category: {
+    type: Sequelize.STRING,
+    allowNull: false
+  },
+  totalTask: {
+    type: Sequelize.INTEGER,
+    allowNull: true,
+  }
+});
+
+// สร้างตารางใหม่ในฐานข้อมูล
+sequelize.sync().then(() => {
+  // เพิ่มข้อมูลในตาราง types
+  Type.bulkCreate([
+    { type_id: 1, category: 'work' },
+    { type_id: 2, category: 'general' },
+    { type_id: 3, category: 'healthy' },
+    { type_id: 4, category: 'hobby' }
+  ]).then(() => {
+    console.log('add to type sucess');
+  }).catch(error => {
+    console.error('adding to type is eror:', error);
   });
 });
 
-// Read a task by ID
-app.get("/tasks/:id", (req, res) => {
-  const { id } = req.params;
-  db.get(`SELECT * FROM Tasks WHERE TasksID = ?`, [id], (err, row) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Server Error");
-    }
-    if (!row) {
-      return res.status(404).send("Task not found");
-    }
-    res.json(row);
+
+app.get('/tasks',(req,res) => {
+  Task.findAll().then(tasks => {
+    res.json(tasks);
+  }).catch(err => {
+    res.status(500).send(err);
   });
 });
 
-// Update a task by ID
-app.put("/tasks/:id", (req, res) => {
-  const { TaskTitle, TaskDescription, Importance, DueDate, TypeID } = req.body;
-  const { id } = req.params;
-  db.run(
-    `UPDATE Tasks SET TaskTitle=?, TaskDescription=?, Importance=?, DueDate=?, TypeID=? WHERE TasksID=?`,
-    [TaskTitle, TaskDescription, Importance, DueDate, TypeID, id],
-    (err) => {
-      if (err) {
-        console.error(err.message);
-        return res.status(500).send("Server Error");
-      }
-      res.send("Task updated successfully");
-    },
-  );
-});
+// show task by id
+app.get('/tasks/:id', (req,res) => {
+  Task.findByPk(req.params.id).then(tasks => {
+    if(!tasks){
+      res.status(404).send('Task not found');
 
-// Delete a task by ID
-app.delete("/tasks/:id", (req, res) => {
-  const { id } = req.params;
-  db.run(`DELETE FROM Tasks WHERE TasksID=?`, [id], (err) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Server Error");
+    }else{
+      res.json(tasks);
     }
-    res.send("Task deleted successfully");
+  }).catch(err => {
+    res.status(500).send(err);
   });
 });
-// Run server
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+
+//create task and update taks in Type
+app.post('/tasks',(req,res) => {
+  const {title,discription,importantce,duedate,type_id} = req.body ;
+  Type.findByPk(type_id).then((Type) => {
+    if(!Type){
+      res.status(404).send("Type Not Found");
+    }
+    else{
+      Type.update({totalTask: Type.totalTask +1}).then(() =>{
+        Task.create(req.body).then(tasks => {
+          res.send(tasks);
+        }).catch(err => {
+          res.status(500).send(err)
+        });
+      }).catch(err => {
+        res.status(500).send(err)
+      });
+    }
+  });
 });
 
+const port = process.env.PORT || 3000;
+app.listen(port,() => console.log(`Listening on port ${port}...`));
