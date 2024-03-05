@@ -69,6 +69,7 @@ const Assignment = sequelize.define('assignments',{
     type: Sequelize.INTEGER,
     allowNull: true,
   }
+  
 });
 
 const User = sequelize.define('user', {
@@ -92,7 +93,7 @@ const User = sequelize.define('user', {
   }
 });
 
-sequelize.sync()
+// sequelize.sync()
 // //สร้างตารางใหม่ในฐานข้อมูล
 // sequelize.sync().then(() => {
 //   // เพิ่มข้อมูลในตาราง types
@@ -314,15 +315,15 @@ app.get('/assignments', (req, res) => {
   }).catch(err => {
     res.status(500).send(err);
   });
+
 });
 
-// Page to show Assignment by id
-app.get('/assignments/:task_id', (req, res) => {
-  Assignment.findByPk(req.params.id).then(assignment => {
-    if (!assignment) {
+app.get('/assignments/:assign_id', (req, res) => {
+  Assignment.findByPk(req.params.assign_id).then(assignments => {
+    if (!assignments) {
       res.status(404).send('Assignment not found');
     } else {
-      res.json(assignment);
+      res.json(assignments);
     }
   }).catch(err => {
     res.status(500).send(err);
@@ -338,9 +339,8 @@ app.post('/assignments', (req, res) => {
   });
 });
 
-// Update an Assignment
-app.put('/assignments/:task_id', (req, res) => {
-  Assignment.findByPk(req.params.id).then(assignment => {
+app.put('/assignments/:assign_id', (req, res) => {
+  Assignment.findByPk(req.params.assign_id).then(assignment => {
     if (!assignment) {
       res.status(400).send('Assignment not found');
     } else {
@@ -356,8 +356,8 @@ app.put('/assignments/:task_id', (req, res) => {
 });
 
 // Delete an Assignment
-app.delete('/assignments/:task_id', (req, res) => {
-  Assignment.findByPk(req.params.id).then(assignment => {
+app.delete('/assignments/:assign_id', (req, res) => {
+  Assignment.findByPk(req.params.assign_id).then(assignment => {
     if (!assignment) {
       res.status(404).send('Assignment not found');
     } else {
@@ -420,8 +420,8 @@ app.put('/users/:id', (req, res) => {
       if (!user) {
         res.status(404).send('User not found');
       } else {
-        const { Username, Email, Password } = req.body;
-        user.update({ Username, Email, Password })
+        const { username, email, password } = req.body;
+        user.update({ username, email, password })
           .then(() => {
             res.send(user);
           })
@@ -458,7 +458,7 @@ app.delete('/users/:id', (req, res) => {
 });
 
 //เเสดงว่าuserคนนี้มีกี่งาน
-app.get('/user/tasks/:user_id', (req, res) => {
+app.get('/usersontasks/:user_id', (req, res) => {
   const { user_id } = req.params;
 
   // Find all assignments for the specified user
