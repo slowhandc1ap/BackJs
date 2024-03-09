@@ -4,6 +4,9 @@ const app = express();
 
 app.use(express.json());
 
+
+
+
 // Annound where database is 
 const sequelize = new Sequelize('database','username','password' , {
   host: 'localhost' ,
@@ -27,8 +30,9 @@ const Task = sequelize.define('tasks',{
     allowNull:false
   },
   duedate: {
-    type: Sequelize.DATE,
-    allowNull: false
+    type: Sequelize.DATEONLY, // ใช้ Sequelize.DATEONLY แทน Sequelize.DATE เพื่อเก็บวันที่เท่านั้น
+    allowNull: false,
+   
   },
   type_id:{
     type: Sequelize.INTEGER,
@@ -93,7 +97,10 @@ const User = sequelize.define('user', {
   }
 });
 
-// sequelize.sync()
+
+
+
+sequelize.sync()
 // //สร้างตารางใหม่ในฐานข้อมูล
 // sequelize.sync().then(() => {
 //   // เพิ่มข้อมูลในตาราง types
@@ -134,24 +141,41 @@ app.get('/tasks/:task_id', (req,res) => {
 
 //create task and update taks in Type
 app.post('/tasks',(req,res) => {
-  const {title,discription,duedate,type_id} = req.body ;
-  Type.findByPk(type_id).then((Type) => {
-    if(!Type){
-      res.status(404).send("Type Not Found");
-    }
-    else{
-      Type.update({totalTask: Type.totalTask +1}).then(() =>{
-        Task.create(req.body).then(tasks => {
-          res.send(tasks);
-        }).catch(err => {
-          res.status(500).send(err)
-        });
-      }).catch(err => {
-        res.status(500).send(err)
-      });
-    }
-  });
+  const {title, discription, duedate, type_id} = req.body ;
+  Type.findByPk(type_id)
+    .then((Type) => {
+      if(!Type){
+        res.status(404).send("Type Not Found");
+      }
+      else{
+        Type.update({totalTask: Type.totalTask + 1})
+          .then(() =>{
+            const moment = require('moment');
+
+            // Convert duedate to English format before creating the task
+            //const formattedDueDate = moment(duedate).format('DD MMMM YY');
+            
+            // Create the task with the formatted duedate
+            Task.create({
+              title: title,
+              discription: discription,
+              duedate: duedate,
+              type_id: type_id
+            }).then(tasks => {
+              res.send(tasks);
+              
+            }).catch(err => {
+              res.status(500).send(err);
+            });
+          }).catch(err => {
+            res.status(500).send(err);
+          });
+      }
+    }).catch(err => {
+      res.status(500).send(err);
+    });
 });
+
 
 
 // show Task follow type_id (if use serch task_id == 1 that shoud show optity of task of type id =1)
@@ -198,42 +222,33 @@ app.put('/tasks/:task_id', (req,res) => {
 });
 
 //for delete a tasks
-app.delete('/tasks/:task_id', (req,res) => {
-  Task.findByPk(req.params.task_id)
-    .then(task => {
-      if (!task) {
-        res.status(404).send('Task not found');
-      } else {
-        const typeId = task.type_id; // เก็บค่า type_id ของ task
-        Type.findByPk(typeId)
-          .then(type => {
-            if (!type) {
-              res.status(404).send('Type not found');
-            } else {
-              type.update({ totalTask: type.totalTask - 1 }) // ลดค่า totalTask ของ Type ลงด้วย -1
-                .then(() => {
-                  task.destroy()
-                    .then(() => {
-                      res.send({});
-                    })
-                    .catch(err => {
-                      res.status(500).send(err);
-                    });
-                })
-                .catch(err => {
-                  res.status(500).send(err);
-                });
-            }
-          })
-          .catch(err => {
-            res.status(500).send(err);
-          });
-      }
-    })
-    .catch(err => {
-      res.status(500).send(err);
-    });
+app.delete('/tasks/:task_id', async (req, res) => {
+  try {
+    const task = await Task.findByPk(req.params.task_id);
+    if (!task) {
+      return res.status(404).send('Task not found');
+    }
+
+    const typeId = task.type_id;
+    const type = await Type.findByPk(typeId);
+    if (!type) {
+      return res.status(404).send('Type not found');
+    }
+
+    await type.update({ totalTask: type.totalTask - 1 });
+
+    await task.destroy();
+
+    // Delete related assignments
+    await Assignment.destroy({ where: { task_id: req.params.task_id } });
+
+    res.send({});
+  } catch (err) {
+    console.error(err);
+    res.status(500).send(err);
+  }
 });
+
 
 
 //Type
@@ -474,6 +489,7 @@ app.get('/usersontasks/:user_id', (req, res) => {
         // Find tasks associated with the extracted task IDs
         Task.findAll({ where: { task_id: taskIds } })
           .then(tasks => {
+            
             res.json(tasks);
           })
           .catch(err => {
