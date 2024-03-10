@@ -370,22 +370,38 @@ app.put('/assignments/:assign_id', (req, res) => {
   });
 });
 
-// Delete an Assignment
+
 app.delete('/assignments/:assign_id', (req, res) => {
-  Assignment.findByPk(req.params.assign_id).then(assignment => {
-    if (!assignment) {
-      res.status(404).send('Assignment not found');
-    } else {
-      assignment.destroy().then(() => {
-        res.send({});
-      }).catch(err => {
-        res.status(500).send(err);
-      });
-    }
-  }).catch(err => {
-    res.status(500).send(err);
-  });
+  const assignId = req.params.assign_id;
+
+  Assignment.findByPk(assignId)
+    .then(assignment => {
+      if (!assignment) {
+        return res.status(404).send('Assignment not found');
+      } else {
+        const taskId = assignment.task_id;
+        const userId = assignment.user_id;
+        
+        // ค้นหาและลบเเถวที่มี task_id และ user_id เหมือนกับ assignment ที่ต้องการลบ
+        Assignment.destroy({ where: { task_id: taskId, user_id: userId } })
+          .then(() => {
+            // ลบ assignment ที่ต้องการ
+            assignment.destroy().then(() => {
+              res.send({});
+            }).catch(err => {
+              res.status(500).send(err);
+            });
+          })
+          .catch(err => {
+            res.status(500).send(err);
+          });
+      }
+    })
+    .catch(err => {
+      res.status(500).send(err);
+    });
 });
+
 
 
 //USER
