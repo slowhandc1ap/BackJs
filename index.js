@@ -6,7 +6,6 @@ app.use(express.json());
 
 
 
-
 // Annound where database is 
 const sequelize = new Sequelize('database','username','password' , {
   host: 'localhost' ,
